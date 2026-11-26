@@ -1,29 +1,3 @@
-export interface PublicDoctor {
-  id: string;
-  fullName: string;
-  specialization: string;
-  assignedRoom: string;
-}
-
-export interface Patient {
-  id: string;
-  patientId: string;
-  fullName: string;
-  age: number;
-  sex: string;
-  contactNumber: string;
-  classification: PatientClassification;
-  serviceType: string;
-  recommendedDoctor?: string;
-  appointmentTime?: string;
-  status: AppointmentStatus;
-  queueNumber?: number;
-  assignedRoom?: string;
-  estimatedWaitMinutes?: number;
-  completedTime?: string;
-  assignedDoctor?: string;
-}
-
 export type AppointmentStatus =
   | "PENDING_RECEPTION"
   | "APPROVED"
@@ -35,16 +9,130 @@ export type AppointmentStatus =
   | "NO_SHOW"
   | "ARCHIVED";
 
-export type PatientClassification = "I" | "II" | "III";
+export type RespondentRole = "self" | "guardian";
+
+export type VisitPurpose = "consultation" | "diagnostic" | "emergency";
+
+export type PriorityLane =
+  | "regular"
+  | "senior_citizen"
+  | "pwd"
+  | "pregnant";
+
+export type PaymentType = "cash" | "hmo" | "philhealth";
+
+export type CivilStatus =
+  | "single"
+  | "married"
+  | "widowed"
+  | "separated"
+  | "other";
+
+export type GuardianRelationship =
+  | "parent"
+  | "spouse"
+  | "child"
+  | "relative"
+  | "other";
+
+export type RoomPreference =
+  | "ward"
+  | "semi_private"
+  | "private"
+  | "suite";
+
+export interface Patient {
+  id: string;
+  patientId: string;
+  respondentRole: RespondentRole;
+  visitPurpose: VisitPurpose;
+  fullName: string;
+  identityUnknown: boolean;
+  dob?: string;
+  age: number;
+  sex: string;
+  civilStatus?: CivilStatus;
+  address?: string;
+  contactNumber?: string;
+  chiefComplaint: string;
+  allergies?: string;
+  hasRequestSlip?: boolean;
+  priorityLane: PriorityLane;
+  paymentType: PaymentType;
+  hmoProvider?: string;
+  hmoNo?: string;
+  philhealthPin?: string;
+  employerName?: string;
+  roomPreference?: RoomPreference;
+  emergencyContactName?: string;
+  emergencyContactRelationship?: string;
+  emergencyContactNumber?: string;
+  guardianFullName?: string;
+  guardianRelationship?: GuardianRelationship;
+  guardianContactNumber?: string;
+  guardianIdType?: string;
+  consentGiven: boolean;
+  status: AppointmentStatus;
+  department?: string;
+  queueNumber?: string;
+  assignedRoom?: string;
+  estimatedWaitMinutes?: number;
+  patientsAhead?: number;
+  queuePosition?: number;
+  completedTime?: string;
+  assignedDoctor?: string;
+}
+
+export interface CreatePatientInput {
+  patientId?: string;
+  respondentRole: RespondentRole;
+  visitPurpose: VisitPurpose;
+  fullName: string;
+  identityUnknown?: boolean;
+  dob?: string;
+  age: number;
+  sex: string;
+  civilStatus?: CivilStatus;
+  address?: string;
+  contactNumber?: string;
+  chiefComplaint: string;
+  allergies?: string;
+  hasRequestSlip?: boolean;
+  priorityLane: PriorityLane;
+  paymentType: PaymentType;
+  hmoProvider?: string;
+  hmoNo?: string;
+  philhealthPin?: string;
+  employerName?: string;
+  roomPreference?: RoomPreference;
+  emergencyContactName?: string;
+  emergencyContactRelationship?: string;
+  emergencyContactNumber?: string;
+  guardianFullName?: string;
+  guardianRelationship?: GuardianRelationship;
+  guardianContactNumber?: string;
+  guardianIdType?: string;
+  signatureData?: string;
+  consentGiven: boolean;
+  status?: AppointmentStatus;
+  queueNumber?: string;
+  assignedDoctor?: string;
+  assignedRoom?: string;
+  estimatedWaitMinutes?: number;
+}
 
 export interface PublicPatient {
   patientId: string;
   fullName: string;
   status: AppointmentStatus;
-  queueNumber?: number;
+  visitPurpose?: VisitPurpose;
+  department?: string;
+  priorityLane?: PriorityLane;
+  queueNumber?: string;
+  queuePosition?: number;
   assignedRoom?: string;
   estimatedWaitMinutes?: number;
+  patientsAhead?: number;
   completedTime?: string;
   assignedDoctor?: string;
-  patientsAhead?: number;
 }

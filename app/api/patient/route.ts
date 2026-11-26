@@ -29,9 +29,17 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let input: ReturnType<typeof parseCreatePatientInput>;
+
   try {
     const body = (await readJsonBody(request)) as Record<string, unknown>;
-    const input = parseCreatePatientInput(body);
+    input = parseCreatePatientInput(body);
+  } catch (error) {
+    // Invalid form input is a client error, not a server failure.
+    return errorResponse(error, 400);
+  }
+
+  try {
     const patient = await createPatient({
       ...input,
       patientId: undefined,
@@ -43,6 +51,8 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    return errorResponse(error);
+    // Keep schema and database details out of the public response.
+    console.error("Patient registration failed:", error);
+    return errorResponse(new Error("Registration failed. Please try again."));
   }
 }

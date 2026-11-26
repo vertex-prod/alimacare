@@ -6,6 +6,10 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Hourglass, CheckCircle, ArrowLeft } from "lucide-react";
+import {
+  departmentLabel,
+  VISIT_PURPOSE_LABELS,
+} from "@/lib/intake-labels";
 import type { AppointmentStatus, PublicPatient } from "@/lib/types";
 
 const TERMINAL_STATUSES: AppointmentStatus[] = [
@@ -139,11 +143,13 @@ export function PatientStatusClient({ patientId }: { patientId: string }) {
   }
 
   const currentStatus = statusLabels[patient.status] ?? patient.status;
-  const hasQueue =
-    patient.queueNumber &&
-    (patient.status === "WAITING" ||
-      patient.status === "CALLED" ||
-      patient.status === "ONGOING");
+  const hasQueue = Boolean(patient.queueNumber);
+  const positionLabel =
+    patient.queuePosition === 0
+      ? "Now serving"
+      : patient.queuePosition !== undefined
+        ? String(patient.queuePosition)
+        : "—";
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-12">
@@ -170,6 +176,28 @@ export function PatientStatusClient({ patientId }: { patientId: string }) {
               <StatusBadge status={patient.status} />
             </div>
 
+            {patient.visitPurpose && (
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">
+                  Visit type
+                </span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {VISIT_PURPOSE_LABELS[patient.visitPurpose]}
+                </span>
+              </div>
+            )}
+
+            {patient.department && (
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">
+                  Department
+                </span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {departmentLabel(patient.department)}
+                </span>
+              </div>
+            )}
+
             <div className="p-3 bg-medical-blue-light/30 rounded-lg text-center">
               <p className="text-medical-blue-dark font-medium">
                 {currentStatus}
@@ -180,25 +208,49 @@ export function PatientStatusClient({ patientId }: { patientId: string }) {
               <div className="text-center py-4">
                 <Hourglass className="w-8 h-8 text-orange-500 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">
-                  Waiting for reception to assign a doctor and room…
+                  Reception is reviewing your intake and confirming your
+                  lane…
                 </p>
               </div>
             )}
 
             {hasQueue && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-blue-50 rounded-lg text-center">
-                  <p className="text-xs text-gray-600">Queue Number</p>
+                  <p className="text-xs text-gray-600">Ticket Number</p>
                   <p className="text-2xl font-bold text-medical-blue">
                     {patient.queueNumber}
                   </p>
                 </div>
                 <div className="p-3 bg-green-50 rounded-lg text-center">
-                  <p className="text-xs text-gray-600">Room</p>
+                  <p className="text-xs text-gray-600">Position</p>
                   <p className="text-2xl font-bold text-green-700">
-                    {patient.assignedRoom ?? "—"}
+                    {positionLabel}
                   </p>
                 </div>
+                <div className="p-3 bg-gray-50 rounded-lg text-center">
+                  <p className="text-xs text-gray-600">People Ahead</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {patient.patientsAhead ?? "—"}
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg text-center">
+                  <p className="text-xs text-gray-600">Est. Wait</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {patient.estimatedWaitMinutes !== undefined
+                      ? `${patient.estimatedWaitMinutes} min`
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {hasQueue && patient.assignedRoom && (
+              <div className="p-3 bg-green-50 rounded-lg text-center">
+                <p className="text-xs text-gray-600">Room</p>
+                <p className="text-lg font-bold text-green-700">
+                  {patient.assignedRoom}
+                </p>
               </div>
             )}
 
@@ -227,16 +279,6 @@ export function PatientStatusClient({ patientId }: { patientId: string }) {
                 </p>
               </div>
             )}
-
-            {patient.status === "WAITING" &&
-              patient.estimatedWaitMinutes != null && (
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-600">Estimated Wait</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {patient.estimatedWaitMinutes} minutes
-                  </p>
-                </div>
-              )}
 
             {patient.completedTime && (
               <div className="p-3 bg-gray-50 rounded-lg">

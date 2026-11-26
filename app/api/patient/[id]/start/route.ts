@@ -20,7 +20,7 @@ export async function POST(
       return NextResponse.json({ error: "Patient not found." }, { status: 404 });
     }
 
-    await startConsultation(id, "doctor");
+    await startConsultation(id);
 
     const patient = await getPatientById(id);
     if (!patient) {

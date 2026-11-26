@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { AppointmentStatus, PatientClassification } from "@/lib/types";
+import type { AppointmentStatus } from "@/lib/types";
 
 type Tone = "neutral" | "info" | "success" | "warning" | "danger" | "muted";
 
@@ -67,26 +67,6 @@ export function StatusBadge({ status }: { status: AppointmentStatus }) {
   return (
     <Badge tone={statusToneMap[status]} dot>
       {statusLabelMap[status]}
-    </Badge>
-  );
-}
-
-const classificationToneMap: Record<PatientClassification, Tone> = {
-  I: "info",
-  II: "warning",
-  III: "danger",
-};
-
-const classificationLabelMap: Record<PatientClassification, string> = {
-  I: "Class I · Normal",
-  II: "Class II · Assessment",
-  III: "Class III · Emergency",
-};
-
-export function ClassificationBadge({ classification }: { classification: PatientClassification }) {
-  return (
-    <Badge tone={classificationToneMap[classification]}>
-      {classificationLabelMap[classification]}
     </Badge>
   );
 }

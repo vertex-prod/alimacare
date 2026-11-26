@@ -16,6 +16,14 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Database
+
+The Supabase/PostgreSQL schema lives in [`database/schema.sql`](./database/schema.sql).
+It supports the adaptive intake router (self/guardian, consultation/diagnostic/
+emergency), generated OPD/LAB/ER ticket numbers, and live queue status.
+See [`database/README.md`](./database/README.md) for setup instructions and the
+destructive reset warning. The old `supabase/migrations` folder has been removed.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
