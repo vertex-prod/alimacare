@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRightLeft, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -158,7 +158,8 @@ export function PatientDetailView() {
   const id = params.id;
   const [transferOpen, setTransferOpen] = useState(false);
   const { data, error, loading, reload } = useApi<PatientDetailResponse>(
-    id ? `/api/admin/patients/${id}` : null
+    id ? `/api/admin/patients/${id}` : null,
+    { refreshMs: 5_000 }
   );
 
   const back = (
@@ -215,10 +216,6 @@ export function PatientDetailView() {
             {patient.identity_unknown ? <Badge tone="danger">Identity unknown</Badge> : null}
           </div>
         </div>
-        <Button variant="secondary" onClick={reload}>
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </Button>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightLeft, Clock3, RefreshCw, User } from "lucide-react";
+import { ArrowRightLeft, Clock3, User } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -167,14 +167,8 @@ export function QueueView() {
       title="Live queue"
       description={
         data
-          ? `Active tickets for ${formatDate(`${data.date}T12:00:00+08:00`)}. Refreshes every 10 seconds.`
+          ? `Active tickets for ${formatDate(`${data.date}T12:00:00+08:00`)}. Updates live.`
           : "Active tickets for today."
-      }
-      actions={
-        <Button variant="secondary" onClick={reload}>
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </Button>
       }
     />
   );

@@ -1,13 +1,10 @@
 "use client";
 
 import {
-  Activity,
   AlertTriangle,
   CheckCircle2,
   Clock3,
-  RefreshCw,
   Stethoscope,
-  Timer,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -27,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/Table";
-import { displayPatientName, formatDate, formatTime, formatWait } from "@/lib/format";
+import { displayPatientName, formatDate, formatTime } from "@/lib/format";
 import { departmentLabel } from "@/lib/labels";
 import type { DashboardData } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
@@ -44,14 +41,8 @@ export function DashboardView() {
       title="Dashboard"
       description={
         data
-          ? `Today's patient flow — ${formatDate(`${data.today}T12:00:00+08:00`)}. Refreshes every 30 seconds.`
+          ? `Today's patient flow — ${formatDate(`${data.today}T12:00:00+08:00`)}. Updates live.`
           : "Today's patient flow."
-      }
-      actions={
-        <Button variant="secondary" onClick={reload}>
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </Button>
       }
     />
   );
@@ -84,8 +75,6 @@ export function DashboardView() {
   const { counts } = data;
   const waiting = counts.PENDING_RECEPTION + counts.APPROVED + counts.WAITING;
   const serving = counts.CALLED + counts.ONGOING;
-  const maxWeekly = Math.max(1, ...data.weekly.map((day) => day.visits));
-
   return (
     <>
       {header}
@@ -96,7 +85,7 @@ export function DashboardView() {
         </p>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
           label="Registered today"
           value={data.total}
@@ -131,34 +120,10 @@ export function DashboardView() {
           icon={<AlertTriangle />}
           tone="red"
         />
-        <StatCard
-          label="Avg. wait to be called"
-          value={
-            data.averageWaitMinutes === null ? "—" : formatWait(data.averageWaitMinutes)
-          }
-          icon={<Timer />}
-          tone="gray"
-        />
-        <StatCard
-          label="Avg. consultation"
-          value={
-            data.averageServiceMinutes === null
-              ? "—"
-              : formatWait(data.averageServiceMinutes)
-          }
-          icon={<Activity />}
-          tone="gray"
-        />
-        <StatCard
-          label="Archived today"
-          value={counts.ARCHIVED}
-          icon={<CheckCircle2 />}
-          tone="gray"
-        />
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card className="p-5 xl:col-span-2">
+      <div className="mt-6">
+        <Card className="p-5">
           <CardHeader
             title="Departments"
             description="Today's tickets per department."
@@ -201,31 +166,6 @@ export function DashboardView() {
           </div>
         </Card>
 
-        <Card className="p-5">
-          <CardHeader title="Last 7 days" description="Registrations per day." />
-          <div className="mt-6 flex h-40 items-end gap-2">
-            {data.weekly.map((day) => (
-              <div
-                key={day.date}
-                className="flex flex-1 flex-col items-center gap-1.5"
-                title={`${day.date}: ${day.visits} registrations`}
-              >
-                <span className="text-[11px] font-semibold text-gray-600">
-                  {day.visits}
-                </span>
-                <div
-                  className={
-                    day.date === data.today
-                      ? "w-full rounded-t-md bg-medical-blue"
-                      : "w-full rounded-t-md bg-medical-blue-light"
-                  }
-                  style={{ height: `${Math.max(4, (day.visits / maxWeekly) * 110)}px` }}
-                />
-                <span className="text-[11px] text-gray-500">{day.label}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
       </div>
 
       <Card className="mt-6 overflow-hidden">
