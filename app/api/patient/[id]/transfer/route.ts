@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { errorResponse } from "@/lib/errors";
 import { parseUuid } from "@/lib/validation";
 import { requireRoles } from "@/lib/api-auth";
@@ -34,7 +33,7 @@ export async function POST(
       : null;
 
     // Find the patient's current ticket
-    const { data: patient, error: patientError } = await supabase
+    const { data: patient, error: patientError } = await auth.staff.db
       .from("patients")
       .select("id, ticket_id")
       .eq("id", patientId)
@@ -51,7 +50,7 @@ export async function POST(
       );
     }
 
-    const { data: transferred, error: transferError } = await supabase.rpc(
+    const { data: transferred, error: transferError } = await auth.staff.db.rpc(
       "transfer_ticket",
       {
         p_ticket_id: patient.ticket_id,

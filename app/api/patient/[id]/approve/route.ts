@@ -19,7 +19,7 @@ export async function POST(
     const assignedDoctor = parseDoctorName(body?.assignedDoctor);
     const assignedRoom = parseRoom(body?.assignedRoom);
 
-    await approvePatient(id, assignedDoctor, assignedRoom);
+    await approvePatient(auth.staff.db, id, assignedDoctor, assignedRoom);
 
     const patient = await getPatientById(id);
     if (!patient) {

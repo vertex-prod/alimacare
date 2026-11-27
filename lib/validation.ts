@@ -242,6 +242,44 @@ export function parseCreatePatientInput(
     500
   );
   const allergies = optionalString(input.allergies, "Known allergies", 500);
+  const symptomDuration = optionalString(
+    input.symptomDuration,
+    "Symptom duration",
+    200
+  );
+  const medicalHistory = optionalString(
+    input.medicalHistory,
+    "Medical history",
+    1000
+  );
+  const existingConditions = optionalString(
+    input.existingConditions,
+    "Existing conditions",
+    1000
+  );
+  const currentMedications = optionalString(
+    input.currentMedications,
+    "Current medications",
+    1000
+  );
+
+  let symptomSeverity: number | undefined;
+
+  if (
+    input.symptomSeverity !== undefined &&
+    input.symptomSeverity !== null &&
+    String(input.symptomSeverity).trim() !== ""
+  ) {
+    symptomSeverity = Number(input.symptomSeverity);
+
+    if (
+      !Number.isInteger(symptomSeverity) ||
+      symptomSeverity < 1 ||
+      symptomSeverity > 10
+    ) {
+      throw new Error("Symptom severity must be a whole number from 1 to 10.");
+    }
+  }
 
   let hasRequestSlip: boolean | undefined;
 
@@ -380,6 +418,11 @@ export function parseCreatePatientInput(
     contactNumber,
     chiefComplaint,
     allergies,
+    symptomDuration,
+    symptomSeverity,
+    medicalHistory,
+    existingConditions,
+    currentMedications,
     hasRequestSlip,
     priorityLane,
     paymentType,

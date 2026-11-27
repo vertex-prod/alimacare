@@ -66,6 +66,10 @@ interface FormState {
   contactNumber: string;
   chiefComplaint: string;
   allergies: string;
+  symptomDuration: string;
+  symptomSeverity: string;
+  medicalHistory: string;
+  currentMedications: string;
   hasRequestSlip: RequestSlip;
   priorityLane: PriorityLane;
   paymentType: PaymentType;
@@ -95,6 +99,10 @@ const INITIAL_FORM: FormState = {
   contactNumber: "",
   chiefComplaint: "",
   allergies: "",
+  symptomDuration: "",
+  symptomSeverity: "",
+  medicalHistory: "",
+  currentMedications: "",
   hasRequestSlip: "",
   priorityLane: "regular",
   paymentType: "cash",
@@ -614,6 +622,22 @@ export default function RegistrationPage() {
         contactNumber: form.contactNumber.trim() || undefined,
         chiefComplaint: form.chiefComplaint.trim(),
         allergies: form.allergies.trim() || undefined,
+        symptomDuration:
+          purpose !== "diagnostic"
+            ? form.symptomDuration.trim() || undefined
+            : undefined,
+        symptomSeverity:
+          purpose !== "diagnostic" && form.symptomSeverity
+            ? Number(form.symptomSeverity)
+            : undefined,
+        medicalHistory:
+          purpose !== "diagnostic"
+            ? form.medicalHistory.trim() || undefined
+            : undefined,
+        currentMedications:
+          purpose !== "diagnostic"
+            ? form.currentMedications.trim() || undefined
+            : undefined,
         hasRequestSlip:
           purpose === "diagnostic" ? form.hasRequestSlip === "yes" : undefined,
         priorityLane: isEmergency ? "regular" : form.priorityLane,
@@ -1349,6 +1373,83 @@ export default function RegistrationPage() {
                         maxLength={500}
                       />
                     </div>
+
+                    {purpose !== "diagnostic" && (
+                      <>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <FieldLabel htmlFor="symptomDuration" optional>
+                              How long have you had these symptoms?
+                            </FieldLabel>
+                            <input
+                              id="symptomDuration"
+                              type="text"
+                              placeholder="e.g. 3 days, since this morning"
+                              value={form.symptomDuration}
+                              onChange={(event) =>
+                                update("symptomDuration", event.target.value)
+                              }
+                              className={inputClass}
+                              maxLength={200}
+                            />
+                          </div>
+                          <div>
+                            <FieldLabel htmlFor="symptomSeverity" optional>
+                              How severe is it? (1 = mild, 10 = worst)
+                            </FieldLabel>
+                            <select
+                              id="symptomSeverity"
+                              value={form.symptomSeverity}
+                              onChange={(event) =>
+                                update("symptomSeverity", event.target.value)
+                              }
+                              className={inputClass}
+                            >
+                              <option value="">Not sure / skip</option>
+                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                                <option key={n} value={n}>
+                                  {n}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <FieldLabel htmlFor="medicalHistory" optional>
+                            Medical history / existing conditions
+                          </FieldLabel>
+                          <textarea
+                            id="medicalHistory"
+                            rows={2}
+                            placeholder="e.g. Hypertension, diabetes, asthma — or write 'None'"
+                            value={form.medicalHistory}
+                            onChange={(event) =>
+                              update("medicalHistory", event.target.value)
+                            }
+                            className={inputClass}
+                            maxLength={1000}
+                          />
+                        </div>
+
+                        <div>
+                          <FieldLabel htmlFor="currentMedications" optional>
+                            Current medications
+                          </FieldLabel>
+                          <textarea
+                            id="currentMedications"
+                            rows={2}
+                            placeholder="e.g. Losartan 50 mg daily — or write 'None'"
+                            value={form.currentMedications}
+                            onChange={(event) =>
+                              update("currentMedications", event.target.value)
+                            }
+                            className={inputClass}
+                            maxLength={1000}
+                          />
+                        </div>
+                      </>
+                    )}
 
                     {purpose === "diagnostic" && (
                       <div>

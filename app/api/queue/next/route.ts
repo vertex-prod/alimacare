@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { errorResponse } from "@/lib/errors";
 import { parseUuid } from "@/lib/validation";
 import { requireRoles } from "@/lib/api-auth";
@@ -26,7 +25,7 @@ export async function POST(request: Request) {
       ? parseUuid(body.hospitalId, "hospital")
       : null;
 
-    const { data, error } = await supabase.rpc("get_next_patient", {
+    const { data, error } = await auth.staff.db.rpc("get_next_patient", {
       p_department_id: departmentId,
       p_hospital_id: hospitalId,
     });

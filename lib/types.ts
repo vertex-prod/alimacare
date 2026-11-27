@@ -97,6 +97,11 @@ export interface CreatePatientInput {
   contactNumber?: string;
   chiefComplaint: string;
   allergies?: string;
+  symptomDuration?: string;
+  symptomSeverity?: number;
+  medicalHistory?: string;
+  existingConditions?: string;
+  currentMedications?: string;
   hasRequestSlip?: boolean;
   priorityLane: PriorityLane;
   paymentType: PaymentType;
@@ -135,4 +140,6 @@ export interface PublicPatient {
   patientsAhead?: number;
   completedTime?: string;
   assignedDoctor?: string;
+  /** Provisional or staff-validated triage level (1 = most urgent). */
+  triageLevel?: number;
 }

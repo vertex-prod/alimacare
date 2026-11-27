@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import type { Db } from "@/lib/db/client";
 
 export interface FormFieldConfig {
   id: string;
@@ -14,8 +14,8 @@ export interface FormFieldConfig {
   is_active: boolean;
 }
 
-export async function getFormFieldsConfig(hospitalId: string): Promise<FormFieldConfig[]> {
-  const { data, error } = await supabase
+export async function getFormFieldsConfig(db: Db, hospitalId: string): Promise<FormFieldConfig[]> {
+  const { data, error } = await db
     .from("form_fields_config")
     .select("*")
     .eq("hospital_id", hospitalId)

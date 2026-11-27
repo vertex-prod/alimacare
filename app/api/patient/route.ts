@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import {
   createPatient,
   getPendingPatients,
@@ -7,6 +7,7 @@ import {
 import { errorResponse, readJsonBody } from "@/lib/errors";
 import { parseCreatePatientInput } from "@/lib/validation";
 import { requireRoles } from "@/lib/api-auth";
+import { runAssessment } from "@/lib/ai/Assessment";
 
 export async function GET(request: Request) {
   // Session reads stay outside `try`; see app/api/admin/dashboard/route.ts.
@@ -18,7 +19,9 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
 
     const patients =
-      status === "waiting" ? await getWaitingPatients() : await getPendingPatients();
+      status === "waiting"
+        ? await getWaitingPatients(auth.staff.db)
+        : await getPendingPatients(auth.staff.db);
 
     return NextResponse.json(patients, {
       headers: { "Cache-Control": "no-store" },
@@ -44,6 +47,16 @@ export async function POST(request: Request) {
       ...input,
       patientId: undefined,
       status: "PENDING_RECEPTION",
+    });
+
+    // AI assessment is strictly additive: it runs after the response is sent,
+    // never throws, and registration succeeds even if it is unavailable.
+    after(async () => {
+      try {
+        await runAssessment(patient.id);
+      } catch (error) {
+        console.error("Post-registration assessment failed:", error);
+      }
     });
 
     return NextResponse.json(patient, {

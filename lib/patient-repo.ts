@@ -3,7 +3,8 @@ import type {
   Patient,
   PublicPatient,
 } from "./types";
-import { supabase } from "./supabase";
+import type { Db } from "./db/client";
+import { getPublicClient } from "./supabase-public";
 
 interface PatientRow {
   id: string;
@@ -116,6 +117,13 @@ export async function createPatient(
   if (input.address) row.address = input.address;
   if (input.contactNumber) row.contact_number = input.contactNumber;
   if (input.allergies) row.allergies = input.allergies;
+  if (input.symptomDuration) row.symptom_duration = input.symptomDuration;
+  if (input.symptomSeverity !== undefined) {
+    row.symptom_severity = input.symptomSeverity;
+  }
+  if (input.medicalHistory) row.medical_history = input.medicalHistory;
+  if (input.existingConditions) row.existing_conditions = input.existingConditions;
+  if (input.currentMedications) row.current_medications = input.currentMedications;
   if (input.hasRequestSlip !== undefined) {
     row.has_request_slip = input.hasRequestSlip;
   }
@@ -149,29 +157,37 @@ export async function createPatient(
     row.estimated_wait_minutes = input.estimatedWaitMinutes;
   }
 
-  const { data, error } = await supabase
-    .from("patients")
-    .insert([row])
-    .select()
-    .single();
+  // Anonymous patients cannot touch the table. register_patient() is a
+  // database function that whitelists these columns and forces the status to
+  // PENDING_RECEPTION, so the public anon key cannot self-approve a patient.
+  const { data, error } = await getPublicClient().rpc("register_patient", {
+    p: row,
+  });
 
   if (error) throw new Error(error.message);
 
   return mapPatientRow(data as PatientRow);
 }
 
-export async function getPendingPatients(): Promise<PublicPatient[]> {
-  const { data, error } = await supabase
-    .from("patients")
-    .select(
-      "patient_id, full_name, status, visit_purpose, department, priority_lane, queue_number, assigned_room, estimated_wait_minutes, assigned_doctor"
-    )
-    .eq("status", "PENDING_RECEPTION")
-    .order("registration_datetime", { ascending: true });
+const LIST_COLUMNS =
+  "patient_id, full_name, status, visit_purpose, department, priority_lane, queue_number, assigned_room, estimated_wait_minutes, assigned_doctor";
 
-  if (error) return [];
+interface ListRow {
+  patient_id: string;
+  full_name: string;
+  status: string;
+  visit_purpose: PublicPatient["visitPurpose"] | null;
+  department: string | null;
+  priority_lane: PublicPatient["priorityLane"] | null;
+  queue_number: string | null;
+  assigned_room: string | null;
+  estimated_wait_minutes: number | null;
+  assigned_doctor: string | null;
+  triage_level?: number | null;
+}
 
-  return data.map((row) => ({
+function mapListRow(row: ListRow): PublicPatient {
+  return {
     patientId: row.patient_id,
     fullName: row.full_name,
     status: row.status as PublicPatient["status"],
@@ -182,111 +198,106 @@ export async function getPendingPatients(): Promise<PublicPatient[]> {
     assignedRoom: row.assigned_room ?? undefined,
     estimatedWaitMinutes: row.estimated_wait_minutes ?? undefined,
     assignedDoctor: row.assigned_doctor ?? undefined,
-  }));
+    triageLevel: row.triage_level ?? undefined,
+  };
 }
 
-export async function getWaitingPatients(): Promise<PublicPatient[]> {
-  const { data, error } = await supabase
+// Lists are ordered by triage level (most urgent first, unassessed last), then
+// by arrival. If the AI-assessment migration has not been applied yet the
+// triage column does not exist, so fall back to the original arrival ordering.
+async function listPatients(
+  db: Db,
+  statuses: PublicPatient["status"][]
+): Promise<PublicPatient[]> {
+  const withTriage = await db
     .from("patients")
-    .select(
-      "patient_id, full_name, status, visit_purpose, department, priority_lane, queue_number, assigned_room, estimated_wait_minutes, assigned_doctor"
-    )
-    .in("status", ["WAITING", "CALLED", "ONGOING"])
+    .select(`${LIST_COLUMNS}, triage_level`)
+    .in("status", statuses)
+    .order("triage_level", { ascending: true, nullsFirst: false })
     .order("registration_datetime", { ascending: true });
 
-  if (error) return [];
+  if (!withTriage.error) return (withTriage.data as ListRow[]).map(mapListRow);
 
-  return data.map((row) => ({
-    patientId: row.patient_id,
-    fullName: row.full_name,
-    status: row.status as PublicPatient["status"],
-    visitPurpose: row.visit_purpose ?? undefined,
-    department: row.department ?? undefined,
-    priorityLane: row.priority_lane ?? undefined,
-    queueNumber: row.queue_number ?? undefined,
-    assignedRoom: row.assigned_room ?? undefined,
-    estimatedWaitMinutes: row.estimated_wait_minutes ?? undefined,
-    assignedDoctor: row.assigned_doctor ?? undefined,
-  }));
+  const legacy = await db
+    .from("patients")
+    .select(LIST_COLUMNS)
+    .in("status", statuses)
+    .order("registration_datetime", { ascending: true });
+
+  if (legacy.error) return [];
+
+  return (legacy.data as ListRow[]).map(mapListRow);
 }
 
-const TERMINAL_STATUSES: PublicPatient["status"][] = [
-  "COMPLETED",
-  "CANCELLED",
-  "NO_SHOW",
-  "ARCHIVED",
-];
+export async function getPendingPatients(db: Db): Promise<PublicPatient[]> {
+  return listPatients(db, ["PENDING_RECEPTION"]);
+}
 
+export async function getWaitingPatients(db: Db): Promise<PublicPatient[]> {
+  return listPatients(db, ["WAITING", "CALLED", "ONGOING"]);
+}
+
+interface TicketStatusRow {
+  patient_id: string;
+  full_name: string;
+  status: PublicPatient["status"];
+  visit_purpose: PublicPatient["visitPurpose"] | null;
+  department: string | null;
+  priority_lane: PublicPatient["priorityLane"] | null;
+  queue_number: string | null;
+  assigned_room: string | null;
+  estimated_wait_minutes: number | null;
+  assigned_doctor: string | null;
+  completed_time: string | null;
+  patients_ahead: number | null;
+}
+
+/**
+ * Public ticket lookup. Goes through the get_ticket_status() database
+ * function, which returns only display fields for one ticket, so it works with
+ * the anonymous key and exposes nothing else. Accepts the readable patient
+ * reference (AC-...) or the internal UUID.
+ */
 export async function getPatientById(
   patientId: string
 ): Promise<PublicPatient | null> {
-  // Accept either the readable patient reference (AC-…) or the internal UUID
-  // so links created by older builds keep working.
-  const isUuid =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      patientId
-    );
-
-  const { data, error } = await supabase
-    .from("patients")
-    .select(
-      "id, patient_id, full_name, status, visit_purpose, department, priority_lane, queue_number, queue_date, assigned_room, estimated_wait_minutes, assigned_doctor, completed_time, registration_datetime, patients_ahead"
-    )
-    .eq(isUuid ? "id" : "patient_id", patientId)
-    .single();
+  const { data, error } = await getPublicClient().rpc("get_ticket_status", {
+    p_ref: patientId,
+  });
 
   if (error || !data) return null;
 
-  const isTerminal = TERMINAL_STATUSES.includes(data.status);
-  const isBeingServed =
-    data.status === "CALLED" || data.status === "ONGOING";
-
-  let patientsAhead: number | undefined;
-
-  if (!isTerminal) {
-    if (isBeingServed) {
-      patientsAhead = 0;
-    } else if (data.queue_date && data.department) {
-      // Count earlier registrations in the same department that are still
-      // waiting. Called/ongoing patients are already at the counter.
-      const { count } = await supabase
-        .from("patients")
-        .select("id", { count: "exact", head: true })
-        .eq("queue_date", data.queue_date)
-        .eq("department", data.department)
-        .lt("registration_datetime", data.registration_datetime)
-        .in("status", ["PENDING_RECEPTION", "APPROVED", "WAITING"]);
-
-      patientsAhead = count ?? 0;
-    }
-  }
+  const row = data as TicketStatusRow;
+  const isBeingServed = row.status === "CALLED" || row.status === "ONGOING";
+  const patientsAhead = row.patients_ahead ?? undefined;
 
   const estimatedWaitMinutes =
-    data.estimated_wait_minutes ??
+    row.estimated_wait_minutes ??
     (patientsAhead !== undefined ? patientsAhead * 10 : undefined);
 
   return {
-    patientId: data.patient_id,
-    fullName: data.full_name,
-    status: data.status as PublicPatient["status"],
-    visitPurpose: data.visit_purpose ?? undefined,
-    department: data.department ?? undefined,
-    priorityLane: data.priority_lane ?? undefined,
-    queueNumber: data.queue_number ?? undefined,
+    patientId: row.patient_id,
+    fullName: row.full_name,
+    status: row.status,
+    visitPurpose: row.visit_purpose ?? undefined,
+    department: row.department ?? undefined,
+    priorityLane: row.priority_lane ?? undefined,
+    queueNumber: row.queue_number ?? undefined,
     queuePosition: isBeingServed
       ? 0
       : patientsAhead !== undefined
         ? patientsAhead + 1
         : undefined,
-    assignedRoom: data.assigned_room ?? undefined,
+    assignedRoom: row.assigned_room ?? undefined,
     estimatedWaitMinutes,
     patientsAhead,
-    assignedDoctor: data.assigned_doctor ?? undefined,
-    completedTime: data.completed_time ?? undefined,
+    assignedDoctor: row.assigned_doctor ?? undefined,
+    completedTime: row.completed_time ?? undefined,
   };
 }
 
 export async function updatePatientStatus(
+  db: Db,
   patientId: string,
   status: PublicPatient["status"],
   updates: {
@@ -304,7 +315,7 @@ export async function updatePatientStatus(
   if (updates.assignedDoctor !== undefined)
     updateData.assigned_doctor = updates.assignedDoctor;
 
-  const { error } = await supabase
+  const { error } = await db
     .from("patients")
     .update(updateData)
     .eq("patient_id", patientId);
@@ -313,10 +324,11 @@ export async function updatePatientStatus(
 }
 
 export async function archivePatient(
+  db: Db,
   patientId: string,
   disposition: "COMPLETED" | "CANCELLED" | "NO_SHOW" | "ARCHIVED"
 ) {
-  const { error } = await supabase
+  const { error } = await db
     .from("patients")
     .update({ status: disposition, completed_time: new Date().toISOString() })
     .eq("patient_id", patientId);
@@ -325,6 +337,7 @@ export async function archivePatient(
 }
 
 export async function updatePatientDetails(
+  db: Db,
   patientId: string,
   details: Partial<
     Pick<
@@ -349,7 +362,7 @@ export async function updatePatientDetails(
     updateData.estimated_wait_minutes = details.estimatedWaitMinutes;
   if (details.status !== undefined) updateData.status = details.status;
 
-  const { error } = await supabase
+  const { error } = await db
     .from("patients")
     .update(updateData)
     .eq("patient_id", patientId);
@@ -358,11 +371,12 @@ export async function updatePatientDetails(
 }
 
 export async function approvePatient(
+  db: Db,
   patientId: string,
   assignedDoctor: string,
   assignedRoom: string
 ) {
-  const { error } = await supabase
+  const { error } = await db
     .from("patients")
     .update({
       status: "APPROVED",
@@ -374,8 +388,8 @@ export async function approvePatient(
   if (error) throw new Error(error.message);
 }
 
-export async function callPatient(patientId: string) {
-  const { error } = await supabase
+export async function callPatient(db: Db, patientId: string) {
+  const { error } = await db
     .from("patients")
     .update({
       status: "CALLED",
@@ -385,8 +399,8 @@ export async function callPatient(patientId: string) {
   if (error) throw new Error(error.message);
 }
 
-export async function completeConsultation(patientId: string) {
-  const { error } = await supabase
+export async function completeConsultation(db: Db, patientId: string) {
+  const { error } = await db
     .from("patients")
     .update({
       status: "COMPLETED",
@@ -397,8 +411,8 @@ export async function completeConsultation(patientId: string) {
   if (error) throw new Error(error.message);
 }
 
-export async function startConsultation(patientId: string) {
-  const { error } = await supabase
+export async function startConsultation(db: Db, patientId: string) {
+  const { error } = await db
     .from("patients")
     .update({
       status: "ONGOING",

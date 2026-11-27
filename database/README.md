@@ -101,12 +101,14 @@ earlier registrations in the same department that are still waiting
 ## Security model
 
 - Row Level Security is enabled on every table.
-- No policies are granted to `anon` or `authenticated`.
-- The Next.js server uses `SUPABASE_SERVICE_ROLE_KEY`, which bypasses RLS.
-- Never import `lib/supabase.ts` into a Client Component or expose the service
-  role key to the browser.
-- The signature and full intake record are only written through server-side API
-  routes. The public status page receives a reduced set of fields.
+- After migration 002 (see below) anonymous visitors can only call two database
+  functions: `register_patient` and `get_ticket_status`. They cannot read or
+  write any table.
+- Staff query with their own login; RLS policies limit each role.
+- `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS and is read in exactly one file,
+  `lib/supabase-privileged.ts`, used only by the AI assessment runner. Never
+  import it elsewhere, never prefix it with `NEXT_PUBLIC_`, and never expose it
+  to the browser.
 
 ## Quick verification
 
@@ -128,3 +130,92 @@ from public.patients
 order by created_at desc
 limit 10;
 ```
+
+## AI assessment, doctors and staff roles (migration 001)
+
+`schema.sql` is destructive, so the AI assessment feature ships as an additive
+migration: [`migrations/001_ai_assessment.sql`](./migrations/001_ai_assessment.sql).
+It is idempotent and can be run on top of an existing `schema.sql` database.
+Run it on a Supabase branch or dev project first.
+
+It adds:
+
+| Object | Purpose |
+| --- | --- |
+| `patients.symptom_duration`, `symptom_severity`, `medical_history`, `existing_conditions`, `current_medications` | Extra intake answers used by the assessment |
+| `patients.clinical_department`, `triage_level`, `ai_assessment_status` | Clinical department (separate from the OPD/LAB/ER ticket prefix in `department`), provisional or validated triage level, AI run state |
+| `doctors`, `doctor_availability`, `doctor_schedules` | Doctor roster, live status and Asia/Manila duty hours |
+| `staff_profiles` | Role (`ADMIN`, `RECEPTION`, `DOCTOR`) for each Supabase Auth user |
+| `ai_assessments`, `assessment_validations` | Versioned AI output and the staff validation decision |
+| `assessment_audit_log` | Append-only record of every manual change (staff, time, original, new) |
+| `doctor_workload()` | Active consultations and queued patients per doctor |
+
+All new tables have RLS enabled and no public policies; only the server-side
+service-role client reads or writes them.
+
+### Sample doctors
+
+The migration seeds clearly named sample doctors (`is_sample = true`). Replace
+them with the hospital's real roster before any clinical use:
+
+```sql
+delete from public.doctors where is_sample;
+```
+
+### Creating the first staff user
+
+1. In Supabase, go to **Authentication > Users** and add a user (email and password).
+2. Give that user a role:
+
+```sql
+insert into public.staff_profiles (user_id, full_name, role)
+values ('<auth user uuid>', 'Reception Admin', 'ADMIN');
+```
+
+For a doctor account, set `role` to `'DOCTOR'` and `doctor_id` to their row in
+`public.doctors`. Doctors can then change only their own availability status.
+
+### Environment variables
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...        # staff sign-in only
+SUPABASE_SERVICE_ROLE_KEY=...            # server only
+GEMINI_API_KEY=...                       # server only; never use NEXT_PUBLIC_
+GEMINI_MODEL=gemini-2.5-flash            # optional; set to a model your key can use
+```
+
+If `GEMINI_API_KEY` is missing or Gemini is down, patient registration still
+works. The deterministic safety rules still run, and the case is marked for
+staff review.
+
+## Least-privilege access (migration 002)
+
+[`migrations/002_rls_least_privilege.sql`](./migrations/002_rls_least_privilege.sql)
+moves the app off a database key that can read everything.
+
+| Who | How they reach the database | What they can do |
+| --- | --- | --- |
+| Anonymous patient | public anon key, two functions only | Register one pending ticket; read one ticket's public status |
+| Reception / Admin | their own login (RLS) | Read and update all patients, assessments, doctors |
+| Doctor | their own login (RLS) | Read and update only patients assigned to them; set their own availability |
+| AI assessment runner | service-role key, one isolated module | Write assessments for the patient it is processing |
+
+Run order in the Supabase SQL editor: `schema.sql`, then
+`migrations/001_ai_assessment.sql`, then `migrations/002_rls_least_privilege.sql`.
+
+### Setup checklist
+
+1. **Run the three SQL files** above, in order. `schema.sql` is destructive on a
+   database that already holds data.
+2. **Create a staff user:** Authentication > Users > Add user (email + password,
+   tick *Auto Confirm User*).
+3. **Give the user a role** (SQL editor):
+   ```sql
+   insert into public.staff_profiles (user_id, full_name, role)
+   select id, 'Reception Admin', 'ADMIN' from auth.users where email = 'you@example.com';
+   ```
+4. **Copy the keys** from Project Settings > API into `.env.local`
+   (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and the
+   service-role key as `SUPABASE_SERVICE_ROLE_KEY`). Do not commit this file.
+5. **Restart** `npm run dev`.

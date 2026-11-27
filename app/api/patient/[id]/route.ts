@@ -62,9 +62,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const patch = parsePatientPatch(body);
 
     if (patch.disposition) {
-      await archivePatient(id, patch.disposition);
+      await archivePatient(auth.staff.db, id, patch.disposition);
     } else if (patch.details) {
-      await updatePatientDetails(id, patch.details);
+      await updatePatientDetails(auth.staff.db, id, patch.details);
     }
 
     const patient = await getPatientById(id);
@@ -87,7 +87,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     const { id: rawId } = await params;
     const id = parseUuid(rawId, "patient");
-    await archivePatient(id, "ARCHIVED");
+    await archivePatient(auth.staff.db, id, "ARCHIVED");
 
     return NextResponse.json({ success: true });
   } catch (error) {
