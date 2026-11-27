@@ -5,40 +5,51 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 export const navItems = [
-  { href: "/admin", label: "Dashboard" },
-  { href: "/patient", label: "Patient Registration" },
-  { href: "/admin/login", label: "Reception Admin" },
-  { href: "/doctor/login", label: "Doctor Dashboard" },
+  { href: "/admin", label: "Dashboard", match: "/admin" },
+  { href: "/patient", label: "Patient Registration", match: "/patient" },
+  { href: "/admin/login", label: "Reception Admin", match: "/admin/login" },
+  { href: "/doctor/login", label: "Doctor Dashboard", match: "/doctor" },
 ];
+
+export function activeNavMatch(pathname: string, items: { match: string }[]) {
+  let best = "";
+
+  for (const item of items) {
+    if (
+      (pathname === item.match || pathname.startsWith(`${item.match}/`)) &&
+      item.match.length > best.length
+    ) {
+      best = item.match;
+    }
+  }
+
+  return best;
+}
 
 export function Header() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const activeMatch = activeNavMatch(pathname, navItems);
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-blur]:bg-white/80">
       <div className="flex items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 rounded-lg border border-medical-blue-light bg-medical-blue-light/50 p-1">
-            <span className="w-2 h-2 rounded-full bg-medical-blue"></span>
-            <span className="w-2 h-2 rounded-full bg-medical-blue"></span>
-            <span className="w-2 h-2 rounded-full bg-medical-blue"></span>
-          </div>
-          <Link href="/" className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center">
+          <Link href="/" className="flex items-center gap-2 whitespace-nowrap">
             <span className="text-medical-blue-dark font-bold tracking-tight">AlimaCare</span>
-            <span className="text-sm font-medium text-gray-600 hidden sm:block">
+            <span className="hidden text-sm font-medium text-gray-600 xl:block">
               Hospital Patient Flow
             </span>
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-3 whitespace-nowrap md:flex lg:gap-6">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`text-sm font-medium transition-colors ${
-                pathname === item.href
+              className={`text-[13px] font-medium transition-colors lg:text-sm ${
+                item.match === activeMatch
                   ? "text-medical-blue-dark"
                   : "text-gray-700 hover:text-medical-blue"
               }`}
@@ -48,12 +59,12 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-4 ml-auto">
-          <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <span className="w-4 h-4 rounded-full bg-medical-blue text-white flex items-center justify-center text-[10px]">
+        <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-4">
+          <button className="flex items-center gap-2 rounded-lg border border-gray-200 px-2.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 lg:px-4">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-medical-blue text-[10px] text-white">
               M
             </span>
-            <span>Staff Portal</span>
+            <span className="hidden lg:inline">Staff Portal</span>
           </button>
           <button
             onClick={() => setMobileMenuOpen((prev) => !prev)}
@@ -75,7 +86,7 @@ export function Header() {
               href={item.href}
               onClick={() => setMobileMenuOpen(false)}
               className={`block px-3 py-2 rounded-lg ${
-                pathname === item.href
+                item.match === activeMatch
                   ? "bg-medical-blue-light text-medical-blue-dark font-medium"
                   : "text-gray-700 hover:bg-gray-50 hover:text-medical-blue"
               }`}
