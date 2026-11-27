@@ -1888,13 +1888,28 @@ export default function RegistrationPage() {
                       />
                       <span className="text-xs leading-5 text-gray-600">
                         <span className="font-semibold text-gray-900">
-                          Data privacy consent.
+                          {isEmergency
+                            ? "Emergency care consent."
+                            : "Data privacy consent."}
                         </span>{" "}
-                        I consent to AlimaCare collecting and processing these
-                        details for {isGuardian ? "the patient's" : "my"} visit,
-                        in line with the Data Privacy Act of 2012 (RA 10173). I
-                        understand my information is shared only with the care
-                        team handling this visit.
+                        {isEmergency ? (
+                          <>
+                            I consent to the patient receiving emergency
+                            assessment and treatment, and to AlimaCare
+                            collecting and processing these details for this
+                            visit in line with the Data Privacy Act of 2012 (RA
+                            10173).
+                          </>
+                        ) : (
+                          <>
+                            I consent to AlimaCare collecting and processing
+                            these details for{" "}
+                            {isGuardian ? "the patient's" : "my"} visit, in
+                            line with the Data Privacy Act of 2012 (RA 10173).
+                            I understand my information is shared only with the
+                            care team handling this visit.
+                          </>
+                        )}
                       </span>
                     </label>
                   </section>
