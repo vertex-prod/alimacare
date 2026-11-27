@@ -3,6 +3,8 @@ import { TRIAGE_LABELS, type TriageLevel } from "../ai/types";
 
 export type ValidationStatus = "PENDING" | "APPROVED" | "OVERRIDDEN" | "FLAGGED";
 
+export type DoctorDecision = "PENDING" | "ACCEPTED" | "REJECTED";
+
 export interface AssessmentRow {
   id: string;
   patient_uuid: string;
@@ -93,6 +95,10 @@ export interface AssessmentView {
     validatedByName: string | null;
     validatedAt: string | null;
     alertAcknowledgedAt: string | null;
+    doctorDecision: DoctorDecision;
+    doctorDecisionNote: string | null;
+    doctorDecisionAt: string | null;
+    doctorDecisionBy: string | null;
   };
   /** What the system will act on: staff decision where present, else the AI's. */
   effective: {
@@ -139,9 +145,16 @@ function mapView(row: Joined, names: Map<string, string>): AssessmentView {
   const finalLevel = (v.final_level as number | null | undefined) ?? null;
   const finalDoctorId = (v.final_doctor_id as string | null | undefined) ?? null;
   const finalDepartment = (v.final_department as string | null | undefined) ?? null;
+  const doctorDecision =
+    (v.doctor_decision as DoctorDecision | null | undefined) ?? "PENDING";
 
   const effectiveLevel = finalLevel ?? row.triage_level;
-  const effectiveDoctorId = finalDoctorId ?? row.recommended_doctor_id;
+  // A declined assignment is not an active assignment: the patient returns to
+  // the reception queue until a doctor is assigned again.
+  const effectiveDoctorId =
+    doctorDecision === "REJECTED"
+      ? null
+      : finalDoctorId ?? row.recommended_doctor_id;
 
   return {
     id: row.id,
@@ -204,6 +217,10 @@ function mapView(row: Joined, names: Map<string, string>): AssessmentView {
       validatedByName: (v.validated_by_name as string | null | undefined) ?? null,
       validatedAt: (v.validated_at as string | null | undefined) ?? null,
       alertAcknowledgedAt: (v.alert_acknowledged_at as string | null | undefined) ?? null,
+      doctorDecision,
+      doctorDecisionNote: (v.doctor_decision_note as string | null | undefined) ?? null,
+      doctorDecisionAt: (v.doctor_decision_at as string | null | undefined) ?? null,
+      doctorDecisionBy: (v.doctor_decision_by as string | null | undefined) ?? null,
     },
     effective: {
       level: effectiveLevel,

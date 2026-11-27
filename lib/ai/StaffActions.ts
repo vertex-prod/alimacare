@@ -2,10 +2,12 @@ import type { StaffContext } from "../api-auth";
 import type { Db } from "../db/client";
 import {
   getAssessmentView,
+  getAuditLog,
   logAudit,
   updateAssessment,
   updateValidation,
   type AssessmentView,
+  type DoctorDecision,
 } from "../db/AssessmentRepository";
 import { updatePatientAssessmentState } from "../db/PatientRepository";
 import { recommendDoctor, validateDoctorLive } from "./DoctorAssignment";
@@ -72,6 +74,59 @@ function stamp(staff: StaffContext, status: "APPROVED" | "OVERRIDDEN" | "FLAGGED
   };
 }
 
+const PENDING_DOCTOR_DECISION = {
+  doctor_decision: "PENDING",
+  doctor_decision_note: null,
+  doctor_decision_at: null,
+  doctor_decision_by: null,
+};
+
+function doctorDecisionStamp(
+  status: DoctorDecision,
+  staff: StaffContext,
+  note?: string
+) {
+  return {
+    doctor_decision: status,
+    doctor_decision_note: note ?? null,
+    doctor_decision_at: new Date().toISOString(),
+    doctor_decision_by: staff.userId,
+  };
+}
+
+/** Only the doctor currently assigned to the patient may decide, and only
+ *  while the assignment is still awaiting their review. */
+function requireAssignedDoctor(view: AssessmentView, staff: StaffContext): void {
+  if (staff.role !== "DOCTOR" || !staff.doctorId) {
+    throw new StaffActionError("Only the assigned doctor can review this patient.", 403);
+  }
+
+  if (view.validation.finalDoctorId !== staff.doctorId) {
+    throw new StaffActionError("This patient is not assigned to you.", 403);
+  }
+
+  if (view.validation.doctorDecision === "ACCEPTED") {
+    throw new StaffActionError("You already accepted this assignment.", 409);
+  }
+
+  if (view.validation.doctorDecision === "REJECTED") {
+    throw new StaffActionError("This assignment was already declined.", 409);
+  }
+}
+
+const INACTIVE_PATIENT_STATUSES = [
+  "COMPLETED",
+  "CANCELLED",
+  "NO_SHOW",
+  "ARCHIVED",
+];
+
+function requireActivePatient(view: AssessmentView): void {
+  if (INACTIVE_PATIENT_STATUSES.includes(view.patient.patientStatus)) {
+    throw new StaffActionError("This patient visit is already closed.", 409);
+  }
+}
+
 export async function approveAssessment(id: string, staff: StaffContext, note?: unknown) {
   const db = staff.db;
   const view = await load(db, id);
@@ -122,12 +177,19 @@ export async function approveAssessment(id: string, staff: StaffContext, note?: 
     note: cleanNote(note, false, "Note"),
   });
 
-  await updateValidation(db, id, {
+  const patch: Record<string, unknown> = {
     ...stamp(staff, view.validation.status === "OVERRIDDEN" ? "OVERRIDDEN" : "APPROVED"),
     final_level: level,
     final_department: department,
     final_doctor_id: doctorId,
-  });
+  };
+
+  // A new person taking the case must review it again.
+  if (doctorId !== view.effective.doctorId) {
+    Object.assign(patch, PENDING_DOCTOR_DECISION);
+  }
+
+  await updateValidation(db, id, patch);
   await updateAssessment(db, id, { pending_assignment: doctorId === null });
 
   return syncPatient(db, id);
@@ -217,6 +279,7 @@ export async function changeDepartment(
     ...stamp(staff, "OVERRIDDEN"),
     final_department: department,
     final_doctor_id: pick.doctor?.id ?? null,
+    ...PENDING_DOCTOR_DECISION,
   });
   await updateAssessment(db, id, { pending_assignment: pick.doctor === null });
 
@@ -269,7 +332,11 @@ export async function reassignDoctor(
     note: cleanNote(options.note, overridden, "A reason for the override"),
   });
 
-  await updateValidation(db, id, { ...stamp(staff, "OVERRIDDEN"), final_doctor_id: doctorId });
+  await updateValidation(db, id, {
+    ...stamp(staff, "OVERRIDDEN"),
+    final_doctor_id: doctorId,
+    ...PENDING_DOCTOR_DECISION,
+  });
   await updateAssessment(db, id, { pending_assignment: false });
 
   return syncPatient(db, id);
@@ -330,4 +397,80 @@ export async function flagAssessment(id: string, staff: StaffContext, note: unkn
   await updateAssessment(db, id, { needs_human_review: true });
 
   return load(db, id);
+}
+
+/** The assigned doctor accepts the patient. The visit becomes an active queue
+ *  entry so the doctor can call the patient when ready. */
+export async function acceptPatient(id: string, staff: StaffContext) {
+  const db = staff.db;
+  const view = await load(db, id);
+
+  requireAssignedDoctor(view, staff);
+  requireActivePatient(view);
+
+  await logAudit(db, {
+    assessmentId: id,
+    staffUserId: staff.userId,
+    staffName: staff.fullName,
+    action: "DOCTOR_ACCEPT_PATIENT",
+    field: "doctor_decision",
+    originalValue: "PENDING",
+    newValue: "ACCEPTED",
+  });
+
+  await updateValidation(db, id, doctorDecisionStamp("ACCEPTED", staff));
+  await updateAssessment(db, id, { pending_assignment: false });
+
+  await updatePatientAssessmentState(db, view.patient.uuid, {
+    triageLevel: view.effective.level,
+    clinicalDepartment: view.effective.department,
+    assignedDoctor: view.effective.doctorName ?? undefined,
+    aiAssessmentStatus: "completed",
+    status: "WAITING",
+  });
+
+  return load(db, id);
+}
+
+/** The assigned doctor declines the assignment. The patient returns to the
+ *  reception queue with no doctor, while the audit log keeps who declined and
+ *  why. */
+export async function declinePatient(
+  id: string,
+  staff: StaffContext,
+  note: unknown
+): Promise<{ assessment: AssessmentView; audit: Awaited<ReturnType<typeof getAuditLog>> }> {
+  const db = staff.db;
+  const view = await load(db, id);
+
+  requireAssignedDoctor(view, staff);
+  requireActivePatient(view);
+
+  const reason = cleanNote(note, true, "A reason for declining the assignment");
+
+  await logAudit(db, {
+    assessmentId: id,
+    staffUserId: staff.userId,
+    staffName: staff.fullName,
+    action: "DOCTOR_DECLINE_PATIENT",
+    field: "doctor_decision",
+    originalValue: "PENDING",
+    newValue: "REJECTED",
+    note: reason,
+  });
+
+  await updateValidation(db, id, doctorDecisionStamp("REJECTED", staff, reason));
+  await updateAssessment(db, id, { pending_assignment: true });
+
+  // Read the response BEFORE releasing the patient: once patients.assigned_doctor
+  // is cleared, row-level security correctly hides the record from this doctor.
+  const assessment = await load(db, id);
+  const audit = await getAuditLog(db, [id]);
+
+  await updatePatientAssessmentState(db, view.patient.uuid, {
+    assignedDoctor: null,
+    status: "PENDING_RECEPTION",
+  });
+
+  return { assessment, audit };
 }

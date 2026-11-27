@@ -202,11 +202,30 @@ moves the app off a database key that can read everything.
 | AI assessment runner | service-role key, one isolated module | Write assessments for the patient it is processing |
 
 Run order in the Supabase SQL editor: `schema.sql`, then
-`migrations/001_ai_assessment.sql`, then `migrations/002_rls_least_privilege.sql`.
+`migrations/001_ai_assessment.sql`, then `migrations/002_rls_least_privilege.sql`,
+then `migrations/003_service_role_grants.sql`, then
+`migrations/004_doctor_decision.sql`.
+
+## Doctor acceptance (migration 004)
+
+[`migrations/004_doctor_decision.sql`](./migrations/004_doctor_decision.sql) adds
+the assigned doctor's decision to `assessment_validations`:
+
+| Column | Meaning |
+| --- | --- |
+| `doctor_decision` | `PENDING` (awaiting review), `ACCEPTED`, or `REJECTED` |
+| `doctor_decision_note` | Required reason when the doctor declines |
+| `doctor_decision_at` | When the decision was made |
+| `doctor_decision_by` | Auth user who made the decision |
+
+When a doctor accepts, the patient moves to `WAITING`. When a doctor declines,
+the assignment is released and the patient returns to `PENDING_RECEPTION` for
+reception/admin to reassign. Every decision is also written to the append-only
+assessment audit log.
 
 ### Setup checklist
 
-1. **Run the three SQL files** above, in order. `schema.sql` is destructive on a
+1. **Run the SQL files** above, in order. `schema.sql` is destructive on a
    database that already holds data.
 2. **Create a staff user:** Authentication > Users > Add user (email + password,
    tick *Auto Confirm User*).

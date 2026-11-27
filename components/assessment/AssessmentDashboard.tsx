@@ -7,13 +7,15 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { createStaffBrowserClient } from "@/lib/supabase-browser";
+import { AssessmentPanel } from "./AssessmentPanel";
 import {
-  AssessmentPanel,
+  doctorDecisionLabel,
+  doctorDecisionTone,
   levelTone,
   validationTone,
   type AuditEntry,
   type DoctorOption,
-} from "./AssessmentPanel";
+} from "./AssessmentSummary";
 
 interface Me {
   fullName: string;
@@ -234,7 +236,14 @@ export function AssessmentDashboard({ mode }: { mode: "admin" | "doctor" }) {
                   <div className="mt-1 flex flex-wrap gap-1">
                     <Badge tone={validationTone(a.validation.status)}>{a.validation.status}</Badge>
                     {a.effective.department && <Badge tone="neutral">{a.effective.department}</Badge>}
-                    {a.pendingAssignment && <Badge tone="warning">No doctor</Badge>}
+                    {a.pendingAssignment && a.validation.doctorDecision !== "REJECTED" && (
+                      <Badge tone="warning">No doctor</Badge>
+                    )}
+                    {a.validation.finalDoctorId !== null && (
+                      <Badge tone={doctorDecisionTone(a.validation.doctorDecision)}>
+                        {doctorDecisionLabel(a.validation.doctorDecision)}
+                      </Badge>
+                    )}
                     {a.status === "failed" && <Badge tone="muted">AI unavailable</Badge>}
                   </div>
                 </button>

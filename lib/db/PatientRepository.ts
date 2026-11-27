@@ -1,5 +1,6 @@
 import type { Db } from "./client";
 import type { ClinicalInput } from "../ai/types";
+import type { AppointmentStatus } from "../types";
 
 export type AiAssessmentStatus =
   | "not_started"
@@ -47,7 +48,8 @@ export async function updatePatientAssessmentState(
     aiAssessmentStatus?: AiAssessmentStatus;
     triageLevel?: number;
     clinicalDepartment?: string | null;
-    assignedDoctor?: string;
+    assignedDoctor?: string | null;
+    status?: AppointmentStatus;
   }
 ): Promise<void> {
   const row: Record<string, unknown> = {};
@@ -58,6 +60,7 @@ export async function updatePatientAssessmentState(
     row.clinical_department = patch.clinicalDepartment;
   }
   if (patch.assignedDoctor !== undefined) row.assigned_doctor = patch.assignedDoctor;
+  if (patch.status !== undefined) row.status = patch.status;
 
   if (Object.keys(row).length === 0) return;
 

@@ -1,10 +1,10 @@
 import { StaffShell } from "@/components/layout/StaffShell";
-import { AssessmentDashboard } from "@/components/assessment/AssessmentDashboard";
+import { DoctorDashboard } from "@/components/doctor/DoctorDashboard";
 
 export default function DoctorPage() {
   return (
     <StaffShell>
-      <AssessmentDashboard mode="doctor" />
+      <DoctorDashboard />
     </StaffShell>
   );
 }
