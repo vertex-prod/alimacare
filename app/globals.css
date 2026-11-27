@@ -1,26 +1,219 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #1e293b;
+  --medical-blue: #2563eb;
+  --medical-blue-light: #dbeafe;
+  --medical-blue-dark: #1e40af;
+  --soft-green: #22c55e;
+  --soft-green-light: #dcfce7;
+  --soft-green-dark: #15803d;
+  --orange: #f59e0b;
+  --orange-light: #fef3c7;
+  --orange-dark: #d97706;
+  --red: #dc2626;
+  --red-light: #fee2e2;
+  --red-dark: #991b1b;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-medical-blue: var(--medical-blue);
+  --color-medical-blue-light: var(--medical-blue-light);
+  --color-medical-blue-dark: var(--medical-blue-dark);
+  --color-soft-green: var(--soft-green);
+  --color-soft-green-light: var(--soft-green-light);
+  --color-soft-green-dark: var(--soft-green-dark);
+  --color-orange: var(--orange);
+  --color-orange-light: var(--orange-light);
+  --color-orange-dark: var(--orange-dark);
+  --color-red: var(--red);
+  --color-red-light: var(--red-light);
+  --color-red-dark: var(--red-dark);
+  --color-gray-50: var(--gray-50);
+  --color-gray-100: var(--gray-100);
+  --color-gray-200: var(--gray-200);
+  --color-gray-300: var(--gray-300);
+  --color-gray-400: var(--gray-400);
+  --color-gray-500: var(--gray-500);
+  --color-gray-600: var(--gray-600);
+  --color-gray-700: var(--gray-700);
+  --color-gray-800: var(--gray-800);
+  --color-gray-900: var(--gray-900);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
+}
+
+/* Card styles */
+.card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid var(--gray-200);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Status badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-pending {
+  background: var(--orange-light);
+  color: var(--orange-dark);
+}
+
+.badge-approved {
+  background: var(--medical-blue-light);
+  color: var(--medical-blue-dark);
+}
+
+.badge-waiting {
+  background: var(--orange-light);
+  color: var(--orange-dark);
+}
+
+.badge-called {
+  background: var(--soft-green-light);
+  color: var(--soft-green-dark);
+}
+
+.badge-ongoing {
+  background: var(--medical-blue-light);
+  color: var(--medical-blue-dark);
+}
+
+.badge-completed {
+  background: var(--soft-green-light);
+  color: var(--soft-green-dark);
+}
+
+.badge-cancelled {
+  background: var(--gray-200);
+  color: var(--gray-600);
+}
+
+.badge-no-show {
+  background: var(--red-light);
+  color: var(--red-dark);
+}
+
+.badge-emergency {
+  background: var(--red-light);
+  color: var(--red-dark);
+}
+
+/* Notification pulse */
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse-red {
+  animation: pulse-red 1.5s infinite;
+}
+
+/* Form focus styles */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--medical-blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Responsive table */
+.table-container {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray-500);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 0.875rem;
+}
+
+.table tr:hover td {
+  background: var(--gray-50);
+}
+
+/* Sidebar active link */
+.nav-link.active {
+  background: var(--medical-blue-light);
+  color: var(--medical-blue-dark);
+}
+
+/* Emergency flash */
+@keyframes flash-red {
+  0% { background-color: var(--red-light); }
+  100% { background-color: transparent; }
+}
+
+.flash-red {
+  animation: flash-red 1s ease-out;
+}
+
+/* Waiting-room progress bar */
+@keyframes waiting-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.waiting-progress {
+  animation: waiting-progress 2.4s ease-in-out infinite;
 }

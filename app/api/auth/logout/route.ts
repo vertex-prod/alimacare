@@ -1,0 +1,13 @@
+import { logoutAdmin } from "@/lib/auth";
+import { assertSameOrigin, errorResponse, json } from "@/lib/errors";
+
+export async function POST(request: Request) {
+  try {
+    assertSameOrigin(request);
+    await logoutAdmin();
+
+    return json({ success: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}

@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AlimaCare Admin Panel
 
-## Getting Started
+Next.js admin panel for the AlimaCare QR intake and queue system. It reads and
+manages the same Supabase database as **alimacare_user** (the patient intake
+form), using the schema in `alimacare_user/database/schema.sql`:
+`patients`, `queue_events`, and `queue_counters`.
 
-First, run the development server:
+## Structure
+
+| Folder | Role |
+| --- | --- |
+| `app/api` | Backend — Route Handlers. All database access, using the service-role key on the server only. |
+| `app/admin` | Frontend — admin pages (login, dashboard, live queue, patient records, export). |
+| `components/admin` | Admin page views and dialogs. |
+| `components/ui` | Shared UI primitives (buttons, cards, badges, tables, modal, toast). |
+| `lib` | Types, labels, Supabase client, session, validation, and patient queries. |
+| `proxy.ts` | Redirects signed-out visitors from `/admin/*` to `/admin/login`. |
+
+### API
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| POST | `/api/auth/login` | Sign in (`{ username, password }`), sets an httpOnly session cookie |
+| POST | `/api/auth/logout` | Sign out |
+| GET | `/api/auth/session` | Current admin |
+| GET | `/api/admin/dashboard` | Today's counts, per-department summary, 7-day trend |
+| GET | `/api/admin/queue?date=` | Active tickets for a day (default: today, Asia/Manila) |
+| GET | `/api/admin/patients?q=&status=&department=&purpose=&from=&to=&page=` | Search patient records |
+| GET | `/api/admin/patients/:id` | Full record and status history |
+| PATCH | `/api/admin/patients/:id` | Assign doctor/room, wait estimate, priority lane, or transfer department |
+| POST | `/api/admin/patients/:id/status` | Change status (`{ status, notes?, assignedDoctor?, assignedRoom? }`) |
+| GET | `/api/admin/export?from=&to=` | CSV export by queue date |
+
+Status changes follow `lib/labels.ts → STATUS_TRANSITIONS`
+(`PENDING_RECEPTION → APPROVED → WAITING → CALLED → ONGOING → COMPLETED`, plus
+cancel / no-show / archive / reopen). The database trigger stamps
+`called_time`, `consultation_start_time`, and `completed_time` and writes the
+`queue_events` row; the API adds the admin's name and note to that row.
+
+## Setup
+
+1. Apply `alimacare_user/database/schema.sql` to your Supabase project (if not
+   already done).
+2. Copy `.env.example` to `.env.local` and fill in:
+   - `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — same project as
+     alimacare_user.
+   - `ADMIN_USERNAME`, `ADMIN_PASSWORD` — the admin login. The schema has no
+     staff table, so the account is configured here.
+   - `ADMIN_SESSION_SECRET` — 32+ random characters used to sign the session
+     cookie. Changing it signs everyone out.
+3. Install and run:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open <http://localhost:3000/admin>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Security notes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The service-role key is only used in `lib/supabase.ts` (marked
+  `server-only`); the browser only talks to `/api/*`.
+- Sessions are HMAC-signed, httpOnly, SameSite=Lax cookies valid for 12 hours.
+  Mutations also check the `Origin` header.
+- Login is throttled per IP (10 failures / 15 min, in-memory).
+- CSV exports contain personal health information and escape formula-like
+  cells.
