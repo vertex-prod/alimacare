@@ -46,6 +46,10 @@ cancel / no-show / archive / reopen). The database trigger stamps
      alimacare_user.
    - `ADMIN_USERNAME`, `ADMIN_PASSWORD` — the admin login. The schema has no
      staff table, so the account is configured here.
+   - `ADMIN_SIGNUP_CODE` — secret code required on `/admin/signup`. Without it,
+     sign up is disabled. Run `database/admin_users.sql` in Supabase once to
+     create the table that stores signed-up admins (`ADMIN_USERNAME` /
+     `ADMIN_PASSWORD` is now optional if you sign up instead).
    - `ADMIN_SESSION_SECRET` — 32+ random characters used to sign the session
      cookie. Changing it signs everyone out.
 3. Install and run:

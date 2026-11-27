@@ -91,8 +91,8 @@ export function PatientsView() {
       />
 
       <Card className="mb-4 p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <div className="relative md:col-span-2">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_minmax(0,2fr)]">
+          <div className="relative md:col-span-2 xl:col-span-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
               value={search}
@@ -138,7 +138,7 @@ export function PatientsView() {
               </option>
             ))}
           </Select>
-          <div className="flex gap-2 md:col-span-2 xl:col-span-1">
+          <div className="grid grid-cols-2 gap-2 md:col-span-2 xl:col-span-1">
             <Input
               type="date"
               value={filters.from}

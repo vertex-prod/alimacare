@@ -4,6 +4,8 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 import { ApiError } from "./errors";
+import { hashPassword, verifyPassword } from "./passwords";
+import { getSupabaseAdmin } from "./supabase";
 import {
   createSessionToken,
   SESSION_COOKIE,
@@ -12,9 +14,10 @@ import {
 } from "./session-token";
 import type { AdminSession } from "./types";
 
-// The patients schema has no staff table, so the admin account is configured
-// with environment variables: ADMIN_USERNAME, ADMIN_PASSWORD, and
-// ADMIN_SESSION_SECRET (used to sign the session cookie).
+// Admins can come from two places: the optional ADMIN_USERNAME / ADMIN_PASSWORD
+// environment account, and accounts created at /admin/signup (stored in the
+// `admin_users` table, see database/admin_users.sql). ADMIN_SESSION_SECRET
+// signs the session cookie, and ADMIN_SIGNUP_CODE gates who may sign up.
 
 function cookieOptions(maxAge: number) {
   return {
@@ -34,18 +37,26 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(left, right);
 }
 
-function configuredCredentials(): { username: string; password: string } {
-  const username = process.env.ADMIN_USERNAME?.trim();
-  const password = process.env.ADMIN_PASSWORD;
-
-  if (!username || !password || !process.env.ADMIN_SESSION_SECRET) {
+function assertConfigured(): void {
+  if (!process.env.ADMIN_SESSION_SECRET) {
     throw new ApiError(
       503,
-      "Admin login is not configured. Set ADMIN_USERNAME, ADMIN_PASSWORD, and ADMIN_SESSION_SECRET in .env.local."
+      "Admin login is not configured. Set ADMIN_SESSION_SECRET in .env.local."
     );
   }
+}
 
-  return { username, password };
+async function startSession(username: string): Promise<AdminSession> {
+  const token = createSessionToken(username);
+  const store = await cookies();
+
+  store.set(SESSION_COOKIE, token, cookieOptions(SESSION_TTL_SECONDS));
+
+  const session = verifySessionToken(token);
+
+  if (!session) throw new ApiError(500, "Could not start the session.");
+
+  return session;
 }
 
 export async function getAdminSession(): Promise<AdminSession | null> {
@@ -67,26 +78,106 @@ export async function loginAdmin(
   username: string,
   password: string
 ): Promise<AdminSession> {
-  const expected = configuredCredentials();
+  assertConfigured();
 
-  // Evaluate both comparisons so timing does not reveal which one failed.
-  const userOk = safeEqual(username.trim().toLowerCase(), expected.username.toLowerCase());
-  const passOk = safeEqual(password, expected.password);
+  const name = username.trim();
+  const envUser = process.env.ADMIN_USERNAME?.trim();
+  const envPass = process.env.ADMIN_PASSWORD;
 
-  if (!userOk || !passOk) {
-    throw new ApiError(401, "Invalid username or password.");
+  // Evaluate every comparison so timing does not reveal which one failed.
+  let ok = false;
+
+  if (envUser && envPass) {
+    const userOk = safeEqual(name.toLowerCase(), envUser.toLowerCase());
+    const passOk = safeEqual(password, envPass);
+    ok = userOk && passOk;
   }
 
-  const token = createSessionToken(expected.username);
-  const store = await cookies();
+  let canonical = envUser ?? name;
 
-  store.set(SESSION_COOKIE, token, cookieOptions(SESSION_TTL_SECONDS));
+  if (!ok) {
+    const { data, error } = await getSupabaseAdmin()
+      .from("admin_users")
+      .select("username, password_hash")
+      .ilike("username", name.replace(/[\\%_]/g, "\\$&"))
+      .maybeSingle();
 
-  const session = verifySessionToken(token);
+    // A missing table just means nobody has signed up yet.
+    if (error && error.code !== "42P01" && error.code !== "PGRST205") {
+      throw error;
+    }
 
-  if (!session) throw new ApiError(500, "Could not start the session.");
+    const hash = data?.password_hash ?? "00:00";
+    const valid = await verifyPassword(password, hash);
 
-  return session;
+    if (data && valid) {
+      ok = true;
+      canonical = data.username;
+    }
+  }
+
+  if (!ok) throw new ApiError(401, "Invalid username or password.");
+
+  return startSession(canonical);
+}
+
+export async function registerAdmin(
+  username: string,
+  password: string,
+  signupCode: string
+): Promise<AdminSession> {
+  assertConfigured();
+
+  const expected = process.env.ADMIN_SIGNUP_CODE;
+
+  if (!expected) {
+    throw new ApiError(
+      503,
+      "Sign up is not enabled. Set ADMIN_SIGNUP_CODE in .env.local."
+    );
+  }
+
+  if (!safeEqual(signupCode, expected)) {
+    throw new ApiError(403, "Invalid sign-up code.");
+  }
+
+  if (!/^[A-Za-z0-9._-]{3,40}$/.test(username)) {
+    throw new ApiError(
+      400,
+      "Username must be 3–40 characters: letters, numbers, dot, dash or underscore."
+    );
+  }
+
+  if (password.length < 8) {
+    throw new ApiError(400, "Password must be at least 8 characters.");
+  }
+
+  const envUser = process.env.ADMIN_USERNAME?.trim();
+
+  if (envUser && envUser.toLowerCase() === username.toLowerCase()) {
+    throw new ApiError(409, "That username is already taken.");
+  }
+
+  const { error } = await getSupabaseAdmin()
+    .from("admin_users")
+    .insert({ username, password_hash: await hashPassword(password) });
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new ApiError(409, "That username is already taken.");
+    }
+
+    if (error.code === "42P01" || error.code === "PGRST205") {
+      throw new ApiError(
+        503,
+        "The admin_users table is missing. Run database/admin_users.sql in Supabase."
+      );
+    }
+
+    throw error;
+  }
+
+  return startSession(username);
 }
 
 export async function logoutAdmin(): Promise<void> {

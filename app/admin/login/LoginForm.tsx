@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertCircle, HeartPulse, Lock } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
@@ -85,6 +86,13 @@ export function LoginForm() {
           {busy ? "Signing in…" : "Sign in"}
         </Button>
       </form>
+
+      <p className="mt-4 text-center text-sm text-gray-500">
+        Need an account?{" "}
+        <Link href="/admin/signup" className="font-semibold text-medical-blue hover:underline">
+          Sign up
+        </Link>
+      </p>
     </Card>
   );
 }

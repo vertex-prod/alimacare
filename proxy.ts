@@ -7,7 +7,7 @@ import { SESSION_COOKIE, verifySessionToken } from "@/lib/session-token";
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const session = verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
-  const isLogin = pathname === "/admin/login";
+  const isLogin = pathname === "/admin/login" || pathname === "/admin/signup";
 
   if (!session && !isLogin) {
     const url = new URL("/admin/login", request.url);

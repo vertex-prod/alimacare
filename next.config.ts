@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   experimental: {
     agentFeedback: true,
   },
+  // Lets you open the dev server from other devices on the LAN.
+  allowedDevOrigins: ["192.168.1.10"],
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
