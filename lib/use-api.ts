@@ -58,12 +58,19 @@ export function useApi<T>(path: string | null, options: UseApiOptions = {}) {
 
     void load();
 
-    const timer =
-      refreshMs > 0 ? window.setInterval(() => void load(), refreshMs) : null;
+    // Poll only while the tab is visible, and catch up as soon as it returns.
+    const tick = () => {
+      if (!document.hidden) void load();
+    };
+
+    const timer = refreshMs > 0 ? window.setInterval(tick, refreshMs) : null;
+
+    if (refreshMs > 0) document.addEventListener("visibilitychange", tick);
 
     return () => {
       active = false;
       if (timer !== null) window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
     };
   }, [path, enabled, refreshMs, version]);
 

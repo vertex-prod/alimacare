@@ -72,7 +72,9 @@ export function PatientsView() {
     return `/api/admin/patients?${params.toString()}`;
   }, [filters, page]);
 
-  const { data, error, loading, reload } = useApi<PatientsResponse>(path);
+  const { data, error, loading, reload } = useApi<PatientsResponse>(path, {
+    refreshMs: 5_000,
+  });
 
   const update = (key: keyof Filters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));

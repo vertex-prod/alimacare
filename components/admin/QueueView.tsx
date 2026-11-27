@@ -144,7 +144,7 @@ export function QueueView() {
   const [department, setDepartment] = useState<string>("ALL");
   const [transferring, setTransferring] = useState<PatientListItem | null>(null);
   const { data, error, loading, reload } = useApi<QueueResponse>("/api/admin/queue", {
-    refreshMs: 10_000,
+    refreshMs: 5_000,
   });
 
   const departments = useMemo(() => {

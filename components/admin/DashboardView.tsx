@@ -35,7 +35,7 @@ import { useApi } from "@/lib/use-api";
 export function DashboardView() {
   const { data, error, loading, reload } = useApi<DashboardData>(
     "/api/admin/dashboard",
-    { refreshMs: 30_000 }
+    { refreshMs: 10_000 }
   );
 
   const header = (
